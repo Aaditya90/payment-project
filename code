@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Buy Now - Secure Checkout</title>
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+  <style>
+    body {
+      font-family: -apple-system, Segoe UI, Roboto, sans-serif;
+      background: #f4f6f8;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+    .card {
+      background: #fff;
+      padding: 32px;
+      border-radius: 16px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+      width: 340px;
+      text-align: center;
+    }
+    h2 { margin-bottom: 4px; color: #1a1a1a; }
+    p.desc { color: #666; font-size: 14px; margin-bottom: 20px; }
+    .price { font-size: 32px; font-weight: 700; color: #111; margin: 16px 0; }
+    button {
+      width: 100%;
+      padding: 14px;
+      background: #3b82f6;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 8px;
+    }
+    button:hover { background: #2563eb; }
+    .secure {
+      margin-top: 16px;
+      font-size: 12px;
+      color: #888;
+    }
+    #status { margin-top: 16px; font-weight: 600; }
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <h2>Resume Optimizer Pro</h2>
+    <p class="desc">AI-powered resume scan & improvement</p>
+    <div class="price">₹99 <span style="font-size:14px; color:#888;">/ one-time</span></div>
+
+    <button onclick="startPayment('resume_tool_onetime')">Pay with Card / UPI</button>
+
+    <div class="secure">🔒 Secured by Razorpay — Cards, UPI (GPay, PhonePe, Paytm), Netbanking</div>
+    <div id="status"></div>
+  </div>
+
+  <script>
+    async function startPayment(productId) {
+      const statusEl = document.getElementById("status");
+      statusEl.textContent = "Creating order...";
+
+      // Step 1: Ask backend to create an order (amount decided server-side)
+      const orderRes = await fetch("/create-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ product_id: productId })
+      });
+      const order = await orderRes.json();
+
+      if (order.error) {
+        statusEl.textContent = "Error: " + order.error;
+        return;
+      }
+
+      statusEl.textContent = "";
+
+      // Step 2: Open Razorpay Checkout popup
+      const options = {
+        key: order.key_id,
+        amount: order.amount,
+        currency: order.currency,
+        name: "Your Company Name",
+        description: "Resume Optimizer Pro",
+        order_id: order.order_id,
+        handler: async function (response) {
+          // Step 3: Verify payment on backend after success
+          statusEl.textContent = "Verifying payment...";
+          const verifyRes = await fetch("/verify-payment", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(response)
+          });
+          const result = await verifyRes.json();
+
+          if (result.status === "success") {
+            statusEl.style.color = "green";
+            statusEl.textContent = "✅ " + result.message;
+          } else {
+            statusEl.style.color = "red";
+            statusEl.textContent = "❌ " + result.message;
+          }
+        },
+        theme: { color: "#3b82f6" }
+      };
+
+      const rzp = new Razorpay(options);
+      rzp.open();
+    }
+  </script>
+
+</body>
+</html>
